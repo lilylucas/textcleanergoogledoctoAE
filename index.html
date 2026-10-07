@@ -1,0 +1,470 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Doc Paste Cleaner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: two-step workbench — paste on the left, cleaned result + copy on the right; stacks on phones */
+:root{
+  --bg:#f6f4f7; --surface:#ffffff; --line:#e3dde5; --fg:#1d1720; --muted:#6c6370;
+  --accent:#664562; --accent-ink:#ffffff; --accent-soft:#f3e9f2;
+  --ok:#2f7a4f; --ok-soft:#e6f3eb; --warn:#a85d12; --warn-soft:#fbefe2; --bad:#b3261e; --bad-soft:#fbe7e5;
+  --email-bg:#ffffff; --email-fg:#0a0a0a;
+  --f-ui:"Figtree",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#17131a; --surface:#211b24; --line:#382f3c; --fg:#efe9f1; --muted:#a99fae;
+  --accent:#c99ac3; --accent-ink:#1d1720; --accent-soft:#33263a;
+  --ok:#7fcf9c; --ok-soft:#1f3328; --warn:#e8a764; --warn-soft:#3a2a1a; --bad:#f2958d; --bad-soft:#3d2120;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#17131a; --surface:#211b24; --line:#382f3c; --fg:#efe9f1; --muted:#a99fae;
+  --accent:#c99ac3; --accent-ink:#1d1720; --accent-soft:#33263a;
+  --ok:#7fcf9c; --ok-soft:#1f3328; --warn:#e8a764; --warn-soft:#3a2a1a; --bad:#f2958d; --bad-soft:#3d2120;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:15px;line-height:1.5;padding:28px 16px 48px}
+.wrap{max-width:1120px;margin:0 auto;display:grid;gap:24px}
+header h1{margin:0;font-size:26px;line-height:1.2;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+header p{margin:6px 0 0;color:var(--muted);max-width:68ch}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:20px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;display:grid;gap:14px;min-width:0}
+.step{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}
+.step b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-size:13px}
+.hint{margin:0;color:var(--muted);font-size:14px}
+#pasteBox{min-height:170px;border:2px dashed var(--line);border-radius:8px;padding:18px;display:grid;place-items:center;text-align:center;color:var(--muted);cursor:text;outline:none;transition:border-color .15s,background .15s}
+#pasteBox:focus{border-color:var(--accent);background:var(--accent-soft);color:var(--fg)}
+#pasteBox strong{color:var(--fg);display:block;font-size:16px;margin-bottom:4px}
+#pasteBox kbd{font-family:var(--f-mono);font-size:13px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 6px;background:var(--surface);color:var(--fg)}
+.opt{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+.opt input{margin-top:3px;accent-color:var(--accent);width:16px;height:16px}
+.opt span small{display:block;color:var(--muted);font-size:13px}
+.status{font-size:14px;border-radius:6px;padding:8px 12px;background:var(--accent-soft)}
+.status.example{border:1px dashed var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.stat{border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0}
+.stat .k{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.stat .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.meter{display:grid;gap:6px}
+.bar{height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--ok);transition:width .3s}
+.meter p{margin:0;font-size:13px;color:var(--muted)}
+.pill{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+button{font:inherit;font-weight:600;font-size:14px;border-radius:6px;padding:10px 16px;cursor:pointer;border:1px solid var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink)}
+button.ghost{background:transparent;color:var(--accent)}
+button:focus-visible,#pasteBox:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#toast{font-size:14px;font-weight:600;color:var(--ok);min-height:21px;margin:0}
+.previewLbl{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin:0}
+#preview{background:var(--email-bg);color:var(--email-fg);border:1px solid var(--line);border-radius:8px;padding:18px 22px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.4;max-height:420px;overflow:auto;min-width:0;overflow-wrap:anywhere}
+#preview p{margin:0}
+#preview a{color:#5E47D2}
+details{border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;font-weight:600;font-size:14px}
+#code{width:100%;min-height:160px;margin-top:10px;font-family:var(--f-mono);font-size:12px;line-height:1.5;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:10px;resize:vertical}
+.how{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 20px}
+.how h2{margin:0 0 8px;font-size:15px}
+.how ol{margin:0;padding-left:20px;display:grid;gap:4px;font-size:14px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Doc Paste Cleaner</h1>
+    <p>Paste a section from the Google Doc here first. It keeps the links, bold, italics, colors and spacing, and strips the hidden code that makes emails get clipped in Gmail.</p>
+  </header>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="s1">
+      <div class="step" id="s1"><b>1</b> Paste from your Google Doc</div>
+      <div id="pasteBox" contenteditable="true" role="textbox" aria-label="Paste area" spellcheck="false">
+        <div><strong>Click here, then press <kbd>Ctrl</kbd> + <kbd>V</kbd></strong>(<kbd>⌘</kbd> + <kbd>V</kbd> on a Mac). Copy one section of the Doc at a time.</div>
+      </div>
+      <div id="status" class="status example">Showing an example. Paste your own section to replace it.</div>
+      <label class="opt" for="keepSize">
+        <input type="checkbox" id="keepSize" checked>
+        <span>Keep the Doc's font sizes<small>Turn off to use the email template's 14px text instead.</small></span>
+      </label>
+      <label class="opt" for="keepFont">
+        <input type="checkbox" id="keepFont">
+        <span>Keep the Doc's font<small>Off by default, so text uses the template's Aktiv Grotesk / Arial.</small></span>
+      </label>
+    </section>
+
+    <section class="panel" aria-labelledby="s2">
+      <div class="step" id="s2"><b>2</b> Copy the clean version into Pardot</div>
+      <div class="stats">
+        <div class="stat"><div class="k">Before</div><div class="v" id="before">–</div></div>
+        <div class="stat"><div class="k">After</div><div class="v" id="after">–</div></div>
+        <div class="stat"><div class="k">Smaller by</div><div class="v" id="saved">–</div></div>
+      </div>
+      <div class="meter">
+        <div class="bar"><i id="barFill"></i></div>
+        <p><span id="pill" class="pill ok">Fine</span> <span id="meterText"></span></p>
+      </div>
+      <div class="btns">
+        <button class="primary" id="copyRich" type="button">Copy cleaned text</button>
+      </div>
+      <p id="toast" role="status" aria-live="polite"></p>
+      <p class="previewLbl">Cleaned text, with links (you can also select and copy it yourself)</p>
+      <div id="preview"></div>
+      <textarea id="code" hidden aria-hidden="true"></textarea>
+    </section>
+  </div>
+
+  <section class="how">
+    <h2>Using it each week</h2>
+    <ol>
+      <li>Format the section in the Google Doc the way you want it, links and all.</li>
+      <li>Copy that section, click the box above and paste.</li>
+      <li>Click <b>Copy cleaned text</b>, click into the matching box in the Pardot template and press <kbd>Ctrl</kbd> + <kbd>V</kbd>.</li>
+      <li>Repeat for each section. Keep the meter in the green across all sections combined.</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+(function(){
+const PT = 4/3;
+const BUDGET = 80*1024; // pasted content budget: Gmail clips at ~102KB, template + Pardot tracking use ~20KB
+const BLOCK = new Set(['P','DIV','H1','H2','H3','H4','H5','H6','LI','UL','OL','TABLE','TBODY','THEAD','TFOOT','TR','TD','TH','BLOCKQUOTE','SECTION','ARTICLE','HEADER','FOOTER','PRE','HR']);
+const SKIP = new Set(['SCRIPT','STYLE','META','TITLE','HEAD','LINK','COLGROUP','COL','IMG','svg','SVG']);
+const $ = id => document.getElementById(id);
+
+let lastHtml = '', lastText = '', out = '', plain = '';
+
+function parseStyle(el){
+  const o = {}; const s = el.getAttribute && el.getAttribute('style');
+  if(!s) return o;
+  s.split(';').forEach(d => { const i = d.indexOf(':'); if(i>0) o[d.slice(0,i).trim().toLowerCase()] = d.slice(i+1).replace(/!important/i,'').trim(); });
+  return o;
+}
+function normColor(c){
+  if(!c) return null; c = c.trim().toLowerCase();
+  if(c==='transparent'||c==='inherit'||c==='initial'||c==='currentcolor') return null;
+  const m = c.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s\/]+([\d.]+%?))?\s*\)$/);
+  if(m){
+    if(m[4]!==undefined && parseFloat(m[4])===0) return null;
+    return '#'+[m[1],m[2],m[3]].map(n=>(+n).toString(16).padStart(2,'0')).join('');
+  }
+  if(/^#[0-9a-f]{3}$/.test(c)) return '#'+c.slice(1).split('').map(x=>x+x).join('');
+  return c;
+}
+const isBlack = c => !c || c==='#000000' || c==='black' || c==='#0a0a0a';
+function toPx(v){
+  if(!v) return null; v = v.trim();
+  let m = v.match(/^([\d.]+)pt$/); if(m) return Math.round(parseFloat(m[1])*PT);
+  m = v.match(/^([\d.]+)px$/); if(m) return Math.round(parseFloat(m[1]));
+  return null;
+}
+function lineHeight(v){
+  if(!v || v==='normal') return null;
+  if(/^[\d.]+$/.test(v)) return String(Math.round(parseFloat(v)*100)/100);
+  let m = v.match(/^([\d.]+)%$/); if(m) return String(Math.round(parseFloat(m[1]))/100);
+  const px = toPx(v); return px ? px+'px' : null;
+}
+function cleanFamily(f){
+  if(!f) return null;
+  const first = f.split(',')[0].replace(/["']/g,'').trim();
+  if(!first || /^(inherit|initial)$/i.test(first)) return null;
+  return first;
+}
+function hasBlock(el){
+  for(const c of el.children){ if(BLOCK.has(c.tagName) || hasBlock(c)) return true; }
+  return false;
+}
+function deriveFmt(el, p){
+  const f = Object.assign({}, p); const t = el.tagName; const st = parseStyle(el);
+  if(t==='B'||t==='STRONG'||/^H[1-6]$/.test(t)) f.b = true;
+  if(t==='I'||t==='EM') f.i = true;
+  if(t==='U') f.u = true;
+  if(t==='S'||t==='STRIKE'||t==='DEL') f.s = true;
+  if(t==='A' && el.getAttribute('href')) f.href = el.getAttribute('href').trim();
+  const fw = st['font-weight'];
+  if(fw){ if(/bold/.test(fw) || parseInt(fw,10)>=600) f.b = true; else if(fw==='normal' || parseInt(fw,10)<600) f.b = false; }
+  if(st['font-style']) f.i = /italic|oblique/.test(st['font-style']);
+  const td = st['text-decoration-line'] || st['text-decoration'];
+  if(td){ if(/underline/.test(td)) f.u = true; else if(/^none/.test(td)) f.u = false; if(/line-through/.test(td)) f.s = true; }
+  if(st.color) f.color = normColor(st.color);
+  if('background-color' in st) f.bg = normColor(st['background-color']);
+  if(st['font-size']){ const px = toPx(st['font-size']); if(px) f.size = px; }
+  if(st['font-family']) f.font = cleanFamily(st['font-family']);
+  if(st['white-space']) f.pre = /pre/.test(st['white-space']);
+  if(st['vertical-align']) f.va = /super/.test(st['vertical-align']) ? 'sup' : /sub/.test(st['vertical-align']) ? 'sub' : null;
+  if(t==='SUP') f.va='sup'; if(t==='SUB') f.va='sub';
+  return f;
+}
+function blockStyle(el){
+  const st = parseStyle(el); const s = {};
+  const mt = toPx(st['margin-top']), mb = toPx(st['margin-bottom']);
+  s.mt = mt||0; s.mb = mb||0;
+  s.lh = lineHeight(st['line-height']);
+  const a = st['text-align']; if(a && /center|right|justify/.test(a)) s.align = a;
+  const pl = toPx(st['margin-left']) || toPx(st['padding-left']); if(pl && pl>0) s.indent = pl;
+  return s;
+}
+
+function convert(html, text){
+  const ctx = { blocks:[], cur:null, inLi:false };
+  const open = (tag, style, list) => { ctx.cur = { tag, style: style||{mt:0,mb:0}, list, runs:[] }; };
+  const finish = () => { if(ctx.cur){ ctx.blocks.push(ctx.cur); ctx.cur = null; } };
+  const blank = () => ctx.blocks.push({ tag:'p', blank:true, style:{mt:0,mb:0}, runs:[] });
+
+  function addText(t, fmt){
+    if(!ctx.cur){
+      if(/^[ \t\r\n]*$/.test(t)) return;                 // source formatting whitespace
+      if(/^[\s ]*$/.test(t)){ blank(); return; }   // bare &nbsp; spacer = a blank line
+      open('p');
+    }
+    if(fmt.pre){
+      const parts = t.split(/\r?\n/);
+      parts.forEach((p,i) => { if(i) ctx.cur.runs.push({br:true}); if(p) ctx.cur.runs.push({text:p, fmt}); });
+    } else {
+      t = t.replace(/[ \t\r\n]+/g,' ');
+      if(t) ctx.cur.runs.push({text:t, fmt});
+    }
+  }
+
+  function walk(node, fmt, list){
+    for(const c of node.childNodes){
+      if(c.nodeType===3){ addText(c.nodeValue, fmt); continue; }
+      if(c.nodeType!==1) continue;
+      const t = c.tagName;
+      if(SKIP.has(t)) continue;
+      if(t==='BR'){
+        if(/Apple-interchange-newline/.test(c.className)) continue;
+        if(ctx.cur) ctx.cur.runs.push({br:true}); else blank();
+        continue;
+      }
+      if(t==='HR'){ finish(); continue; }
+      if(t==='UL'||t==='OL'){ finish(); walk(c, fmt, t); finish(); continue; }
+      if(t==='LI'){
+        finish();
+        const inner = c.querySelector('p');
+        const st = blockStyle(inner || c);
+        open('li', st, list || 'UL');
+        const was = ctx.inLi; ctx.inLi = true;
+        walk(c, deriveFmt(c, fmt), list); ctx.inLi = was;
+        finish(); continue;
+      }
+      if(ctx.inLi && BLOCK.has(t)){
+        if(ctx.cur && ctx.cur.runs.length) ctx.cur.runs.push({br:true});
+        walk(c, deriveFmt(c, fmt), list); continue;
+      }
+      if(BLOCK.has(t)){
+        finish();
+        const f = deriveFmt(c, fmt);
+        if(hasBlock(c)){ walk(c, f, list); finish(); }
+        else { open('p', blockStyle(c)); walk(c, f, list); finish(); }
+        continue;
+      }
+      // inline element
+      const f = deriveFmt(c, fmt);
+      if(hasBlock(c)){ finish(); walk(c, f, list); finish(); }
+      else walk(c, f, list);
+    }
+  }
+
+  if(html){
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    walk(doc.body, {}, null); finish();
+  } else {
+    (text||'').split(/\r?\n/).forEach(line => { if(line.trim()===''){ blank(); } else { open('p'); ctx.cur.runs.push({text:line, fmt:{pre:true}}); finish(); } });
+  }
+
+  // tidy each block; drop leading/trailing blank lines
+  for(const b of ctx.blocks){
+    if(b.blank) continue;
+    while(b.runs.length && b.runs[b.runs.length-1].br) b.runs.pop();
+    const first = b.runs.find(r=>!r.br), last = [...b.runs].reverse().find(r=>!r.br);
+    if(first && !first.fmt.pre) first.text = first.text.replace(/^ +/,'');
+    if(last && !last.fmt.pre) last.text = last.text.replace(/ +$/,'');
+    b.runs = b.runs.filter(r => r.br || r.text);
+    if(!b.runs.some(r => !r.br && r.text.replace(/[\s ]/g,''))) { b.blank = true; b.runs = []; }
+  }
+  while(ctx.blocks.length && ctx.blocks[0].blank) ctx.blocks.shift();
+  while(ctx.blocks.length && ctx.blocks[ctx.blocks.length-1].blank) ctx.blocks.pop();
+  return ctx.blocks;
+}
+
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function textHtml(r){
+  let s = esc(r.text);
+  if(r.fmt.pre){ s = s.replace(/\t/g,'&nbsp;&nbsp;&nbsp;&nbsp;').replace(/ {2,}/g, m => ' ' + '&nbsp;'.repeat(m.length-1)); }
+  return s.replace(/ /g,'&nbsp;');
+}
+
+function dominant(runs, key){
+  const tally = {};
+  runs.forEach(r => { if(!r.br && r.fmt[key]) tally[r.fmt[key]] = (tally[r.fmt[key]]||0) + r.text.length; });
+  let best = null, n = 0; for(const k in tally){ if(tally[k]>n){ n = tally[k]; best = k; } }
+  return best;
+}
+
+function serialize(blocks, opts){
+  let html = '', prevStyle = null, prevSize = null, prevFont = null;
+  let i = 0;
+  const pStyle = (st, size, font, isBlank) => {
+    const parts = [];
+    parts.push((st.mt||st.mb) ? `margin:${st.mt}px 0 ${st.mb}px` : 'margin:0');
+    if(st.indent && !isBlank) parts.push(`padding-left:${st.indent}px`);
+    if(st.lh) parts.push('line-height:'+st.lh);
+    if(st.align && !isBlank) parts.push('text-align:'+st.align);
+    if(size) parts.push(`font-size:${size}px`);
+    if(font) parts.push(`font-family:${font},Arial,sans-serif`);
+    return parts.join(';');
+  };
+  const inner = (runs, pSize, pFont, inLink) => {
+    // merge runs with identical formatting
+    const key = r => r.br ? 'BR' : [r.fmt.b,r.fmt.i,r.fmt.u&&!inLink,r.fmt.s,inLink?'':r.fmt.color,r.fmt.bg,r.fmt.size,r.fmt.font,r.fmt.va].join('|');
+    const merged = [];
+    runs.forEach(r => { const last = merged[merged.length-1]; if(last && !r.br && !last.br && key(last)===key(r) && !!last.fmt.pre===!!r.fmt.pre){ last.text += r.text; } else merged.push(r.br ? r : {text:r.text, fmt:r.fmt}); });
+    return merged.map(r => {
+      if(r.br) return '<br>';
+      let s = textHtml(r); const f = r.fmt;
+      const css = [];
+      if(!inLink && !isBlack(f.color)) css.push('color:'+f.color);
+      if(f.bg) css.push('background-color:'+f.bg);
+      if(opts.keepSize && f.size && String(f.size)!==String(pSize)) css.push(`font-size:${f.size}px`);
+      if(opts.keepFont && f.font && f.font!==pFont) css.push(`font-family:${f.font},Arial,sans-serif`);
+      if(css.length) s = `<span style="${css.join(';')}">${s}</span>`;
+      if(f.va) s = `<${f.va}>${s}</${f.va}>`;
+      if(f.s) s = `<s>${s}</s>`;
+      if(f.u && !inLink) s = `<u>${s}</u>`;
+      if(f.i) s = `<em>${s}</em>`;
+      if(f.b) s = `<strong>${s}</strong>`;
+      return s;
+    }).join('');
+  };
+  const content = (b, pSize, pFont) => {
+    let s = '', j = 0; const runs = b.runs;
+    while(j < runs.length){
+      const r = runs[j];
+      const href = !r.br && r.fmt.href;
+      if(!href){ let k = j; while(k < runs.length && !(runs[k].fmt && runs[k].fmt.href && !runs[k].br)) k++; s += inner(runs.slice(j,k), pSize, pFont, false); j = k; continue; }
+      let k = j; while(k < runs.length && !runs[k].br && runs[k].fmt.href===href) k++;
+      const group = runs.slice(j,k);
+      const color = group.map(g=>g.fmt.color).find(c=>c && !isBlack(c));
+      const under = group[0].fmt.u;
+      const css = []; if(color) css.push('color:'+color); css.push('text-decoration:'+(under?'underline':'none'));
+      s += `<a href="${esc(href)}" target="_blank" style="${css.join(';')}">${inner(group, pSize, pFont, true)}</a>`;
+      j = k;
+    }
+    return s;
+  };
+
+  while(i < blocks.length){
+    const b = blocks[i];
+    if(b.tag==='li'){
+      const type = b.list==='OL' ? 'ol' : 'ul';
+      let items = '';
+      while(i < blocks.length && blocks[i].tag==='li' && (blocks[i].list==='OL'?'ol':'ul')===type){
+        const li = blocks[i];
+        const size = opts.keepSize ? dominant(li.runs,'size') : null;
+        const font = opts.keepFont ? dominant(li.runs,'font') : null;
+        items += `<li style="${pStyle(li.style,size,font,false)}">${content(li,size,font)}</li>`;
+        prevStyle = li.style; prevSize = size; prevFont = font; i++;
+      }
+      html += `<${type} style="margin:0;padding-left:24px">${items}</${type}>\n`;
+      continue;
+    }
+    if(b.blank){
+      const st = { mt:0, mb:0, lh: prevStyle ? prevStyle.lh : null };
+      html += `<p style="${pStyle(st, prevSize, null, true)}">&nbsp;</p>\n`;
+      i++; continue;
+    }
+    const size = opts.keepSize ? dominant(b.runs,'size') : null;
+    const font = opts.keepFont ? dominant(b.runs,'font') : null;
+    html += `<p style="${pStyle(b.style,size,font,false)}">${content(b,size,font)}</p>\n`;
+    prevStyle = b.style; prevSize = size; prevFont = font; i++;
+  }
+  return html.trim();
+}
+
+function kb(bytes){ return bytes < 1024 ? bytes+' B' : (bytes/1024).toFixed(bytes<10240?1:0)+' KB'; }
+const bytes = s => new Blob([s]).size;
+
+function render(){
+  const blocks = convert(lastHtml, lastText);
+  out = serialize(blocks, { keepSize: $('keepSize').checked, keepFont: $('keepFont').checked });
+  $('preview').innerHTML = out || '<p style="color:#6c6370">Nothing to show yet.</p>';
+  plain = $('preview').innerText;
+  $('code').value = out;
+  const b = bytes(lastHtml || lastText || ''), a = bytes(out);
+  $('before').textContent = kb(b); $('after').textContent = kb(a);
+  $('saved').textContent = b ? Math.max(0, Math.round((1 - a/b)*100)) + '%' : '–';
+  const pct = Math.min(100, a/BUDGET*100);
+  const fill = $('barFill'); fill.style.width = Math.max(pct, a?2:0) + '%';
+  const pill = $('pill');
+  if(pct < 60){ pill.className='pill ok'; pill.textContent='Fine'; fill.style.background='var(--ok)'; }
+  else if(pct < 100){ pill.className='pill warn'; pill.textContent='Getting close'; fill.style.background='var(--warn)'; }
+  else { pill.className='pill bad'; pill.textContent='Too big'; fill.style.background='var(--bad)'; }
+  $('meterText').textContent = `${kb(a)} of the about 80 KB room for pasted content. Gmail clips the whole email at about 102 KB.`;
+}
+
+const box = $('pasteBox');
+box.addEventListener('paste', e => {
+  e.preventDefault();
+  const cd = e.clipboardData;
+  lastHtml = cd.getData('text/html') || '';
+  lastText = cd.getData('text/plain') || '';
+  if(!lastHtml && !lastText) return;
+  render();
+  const lines = convert(lastHtml, lastText).filter(b=>!b.blank).length;
+  const st = $('status'); st.className = 'status';
+  st.textContent = `Pasted ${lines} line${lines===1?'':'s'}${/docs-internal-guid/.test(lastHtml)?' from Google Docs':''}. Paste again to replace it.`;
+  box.innerHTML = '<div><strong>Pasted ✓</strong>Click here and paste again for the next section.</div>';
+  box.blur();
+  $('toast').textContent = '';
+});
+box.addEventListener('beforeinput', e => { if(e.inputType !== 'insertFromPaste') e.preventDefault(); });
+box.addEventListener('drop', e => e.preventDefault());
+
+['keepSize','keepFont'].forEach(id => $(id).addEventListener('change', render));
+
+function flash(msg){ const t = $('toast'); t.textContent = msg; clearTimeout(flash.t); flash.t = setTimeout(()=>{ t.textContent=''; }, 4000); }
+
+$('copyRich').addEventListener('click', () => {
+  const fallback = () => {
+    const r = document.createRange(); r.selectNodeContents($('preview'));
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    let ok = false; try { ok = document.execCommand('copy'); } catch(_){}
+    flash(ok ? 'Copied. Paste it into the Pardot text box.' : 'The preview is selected. Press Ctrl + C (⌘ + C) to copy it.');
+  };
+  try {
+    if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){
+      navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([out], {type:'text/html'}),
+        'text/plain': new Blob([plain], {type:'text/plain'})
+      })]).then(() => flash('Copied. Paste it into the Pardot text box.'), fallback);
+    } else fallback();
+  } catch(_){ fallback(); }
+});
+
+// Example content in the same shape Google Docs puts on the clipboard
+const S = 'font-size:14pt;font-family:Arial,sans-serif;color:#000000;background-color:transparent;font-weight:400;font-style:normal;font-variant:normal;text-decoration:none;vertical-align:baseline;white-space:pre-wrap;white-space:pre-wrap;';
+const L = 'font-size:14pt;font-family:Arial,sans-serif;color:#1155cc;background-color:transparent;font-weight:400;font-style:normal;font-variant:normal;text-decoration:underline;-webkit-text-decoration-skip:none;text-decoration-skip-ink:none;vertical-align:baseline;white-space:pre-wrap;';
+const P = 'line-height:1.2;margin-top:0pt;margin-bottom:0pt;';
+const p = (inner) => `<p dir="ltr" style="${P}">${inner}</p>`;
+const sp = (t) => `<span style="${S}">${t}</span>`;
+const ln = (t,h) => `<a href="${h}" style="text-decoration:none;"><span style="${L}">${t}</span></a>`;
+lastHtml = `<meta charset="utf-8"><b style="font-weight:normal;" id="docs-internal-guid-example">`
+ + p(ln('Jay Askinasi','https://filmandtv.luminatedata.com/view_employees_detail.php?emp_id=152339'))
+ + p(sp('Now: Chief Revenue Officer, Skydance (New York)'))
+ + p(sp('Was: Chief Revenue Officer, Paramount Skydance (New York)')) + '<br>'
+ + p(sp('Karen Bailey'))
+ + p(sp('Now: Pursuing other opportunities (at the end of October 2026)'))
+ + p(sp('Was: Executive Vice President, Original Programming, Starz')) + '<br>'
+ + p(ln('Safaa Benazzouz','https://filmandtv.luminatedata.com/view_employees_detail.php?emp_id=133897'))
+ + p(sp('Now: Deputy Chief Executive Officer, Xilam Animation (Paris)'))
+ + p(sp('Was: Executive Vice President, Distribution, Xilam Animation (Paris)'))
+ + `</b><br class="Apple-interchange-newline">`;
+render();
+})();
+</script>
+
+</body></html>
